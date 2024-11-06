@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Demo</title>
+    <!-- 请勿在项目正式环境中引用该 layui.css 地址 -->
+    <link href="//unpkg.com/layui@2.9.17/dist/css/layui.css" rel="stylesheet">
+    <link rel="stylesheet" href="./css/index.css">
+    <script src="./js/jquery-3.2.1.min.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <!-- <link rel="stylesheet" href="./layui/css/layui.css"> -->
+    <style>
+        .boxdss {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .boxdss_left,
+        .boxdss_right {
+            width: 50%;
+            height: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .boxdss_right {
+            overflow-y: auto;
+        }
+
+        .orderStyle {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .view-basket {
+            margin: 0 auto;
+        }
+
+        .submitstyle {
+            background-color: #000000;
+        }
+
+        .tips {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            width: calc(100% - 110px);
+            /* height: 50px; */
+            min-height: 50px;
+            background-color: #f8f8f8;
+            margin: 0 0 15px 110px;
+            /* line-height: 50px; */
+            padding: 11px;
+            /* content-box 怪异盒模型：容器大小不包含内边距和边框的；内边距和边框会撑开容器的 */
+            /* box-sizing: content-box; */
+            /* border-box 标准盒模型;标准盒模型包含：内容区（contnet）+ 填充区（padding）+ 边框（border）= 盒子大小 */
+            box-sizing: border-box;
+        }
+
+        .box {
+            /* block 块级独占一行，可以设置宽高 */
+            /* display: block; */
+            /* 行内元素：并行排列，设置宽高无效 */
+            /* display: inline; */
+            /* 行内块元素：有块级元素的特点，可以设置宽高；又有行内元素的特点可以并行排列 */
+            /* display: inline-block; */
+            /* 隐藏元素,只是页面上不显示，但是标签是存在的 */
+            display: none;
+            width: 300px;
+            height: 300px;
+            background-color: brown;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="boxdss">
+        <div class="boxdss_left">
+            <form class="layui-form" action="">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">Name</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="username" lay-verify="required" placeholder="请输入" autocomplete="off"
+                            class="layui-input" id="username">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">phone number</label>
+                    <div class="layui-input-block">
+                        <input type="text" name="mobile" lay-verify="required" placeholder="请输入" autocomplete="off"
+                            class="layui-input" id="mobile">
+                    </div>
+                </div>
+                <div class="layui-form-item">
+                    <label class="layui-form-label">收否自提</label>
+                    <div class="layui-input-block">
+                        <input type="checkbox" name="selfPickup" lay-skin="switch" lay-filter="switchTest" title="是|否">
+                    </div>
+                </div>
+
+                <div class="layui-form-item" id="addressField">
+                    <label class="layui-form-label">Address</Address></label>
+                    <div class="layui-input-block">
+                        <input type="text" name="address" placeholder="请输入" autocomplete="off" class="layui-input">
+                    </div>
+                </div>
+
+                <div class="tips" id="showselfPickupaderr">
+                    Pick up locations</address>: London
+                </div>
+
+                <div class="layui-form-item layui-form-text">
+                    <label class="layui-form-label">note</label>
+                    <div class="layui-input-block">
+                        <textarea placeholder="请输入内容" class="layui-textarea" name="remark"></textarea>
+                    </div>
+                </div>
+
+
+                <div class="layui-form-item">
+                    <div class="layui-input-block">
+                        <button type="submit" class="layui-btn submitstyle" lay-submit lay-filter="demo1">立即提交</button>
+                        <button type="reset" class="layui-btn layui-btn-primary">重置</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="boxdss_right">
+            <div class="orderStyle">
+                <div class="basket">
+                    <h2>BASKET</h2>
+                    <p class="free-shipping">You are eligible for free shipping.</p>
+                    <div class="contentBOx"></div>
+                    <div class="edit"><span id="huhao" style="margin-right: 30px;font-weight: 700;"></span> <span
+                            id="sum"></span><span style="margin-left: 20px;color: red;" id="youfei"></span> </div>
+                    <div id="editOrder" class="tijiao">编辑</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 请勿在项目正式环境中引用该 layui.js 地址 -->
+    <script src="//unpkg.com/layui@2.9.17/dist/layui.js"></script>
+    <script>
+        if(localStorage.getItem('info')) {
+            let dsf = JSON.parse(localStorage.getItem('info'))
+            $('#username').val(dsf.username)
+            $('#mobile').val(dsf.mobile)
+        }
+        layui.use(['form', 'laydate', 'util'], function () {
+            let showselfPickupaderr = document.getElementById('showselfPickupaderr')
+            showselfPickupaderr.style.display = 'none';
+
+            let orderData = [];
+            let youFei = null;
+            let zongE = null;
+            let huhao = ''
+            let cartlistid = null;
+            var form = layui.form;
+            var layer = layui.layer;
+            var laydate = layui.laydate;
+            var util = layui.util;
+
+
+            // 指定开关事件
+            form.on('switch(switchTest)', function (data) {
+                var addressField = document.getElementById('addressField');
+                var remarkFied = document.getElementById('remarkFied')
+                if (this.checked) {
+                    // 开关开启时隐藏手机号输入框
+                    addressField.style.display = 'none';
+                    showselfPickupaderr.style.display = '';
+
+                } else {
+                    // 开关关闭时显示手机号输入框
+                    addressField.style.display = '';
+                    showselfPickupaderr.style.display = 'none';
+
+                }
+
+            });
+            // 提交事件
+            form.on('submit(demo1)', function (data) {
+
+                var field = data.field; // 获取表单字段值
+                field.youFei = youFei
+                field.orderinfo = cartlistid
+                field.zongE = zongE
+                field.huhao = localStorage.getItem('huhao')
+                field.selfPickup = field.selfPickup == 'on' ? '自提' : '邮寄';
+
+
+                layer.confirm('您确认要提交吗？', {
+                    icon: 3
+                }, function () {
+                    layer.msg('确定', {
+                        icon: 1
+                    });
+                    async function createShop() {
+                        const response = await fetch('/indexPageApi/addUserInfo', {
+                            method: 'POST', // 或者 'GET'
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(field),
+                        });
+                        const data = await response.json();
+                        if (response.status == 200) {
+                            setTimeout(() => {
+                                let params = {
+                                    remark: `${huhao}:${field.remark}`,
+                                    hejijine: zongE + youFei
+                                }
+                                // 数据提交成功之后立即调佣支付接口
+                                if ((zongE + youFei) * 100 < 30) {
+                                    layer.msg(`支付金额不能小于30`, {
+                                        icon: 0
+                                    });
+                                    return
+                                } else {
+                                    pay(params)
+                                }
+
+
+                            }, 2000)
+                        } 
+                    }
+                    createShop().catch(console.error);
+                }, function () {
+                    layer.msg('取消');
+                });
+
+                return false; // 阻止默认 form 跳转
+            });
+
+            // '' , "" , ``  `${}`
+            // 获取购物车数据
+            function getCartList() {
+                $.ajax({
+                    url: `/indexPageApi/getCartList/${localStorage.getItem('huhao')}`,
+                    success: function (res) {
+                        orderData = res.data.rows.filter(itd => itd.huhao == localStorage.getItem('huhao')) ?? []
+                        let sumresult = 0
+                        orderData.forEach(ifd => {
+                            sumresult += ifd.price * ifd.value
+                        })
+                        let idsss = orderData.map(ids => ids.id)
+
+                        // [117,118]
+                        cartlistid = idsss.join(',')
+                        // "117,118"
+                        console.log(cartlistid, 'orderData');
+
+
+                        zongE = sumresult
+                        $('#sum').html(`合计:$${sumresult}`)
+                        $('#youfei').html(`邮费:${sumresult > 2000 ? '$0' : '$100'}`)
+                        $('#huhao').html(`户号：${orderData[0].huhao}`)
+                        huhao = orderData[0].huhao
+                        youFei = sumresult > 2000 ? 0 : 100
+                        let orederList = ``
+                        orderData.forEach(function (tr) {
+                            orederList += `
+        <div class="basket-item">
+            <img src="${tr.shopimg}" class="cartImg" alt="loading">
+            <div class="basket-item-details">
+                <h4>${tr.title}</h4>
+                <p>$${tr.price}</p>
+            </div>
+            <div class="basket-item-actions">
+                <span style="margin-right:10px">数量</span>
+                <input type="text" value="${tr.value}" class="intBox" disabled>
+            </div>
+        </div>`
+                        })
+
+                        $('.contentBOx').html(orederList)
+                        
+            // 控制购物车图片的预览
+            $('.cartImg').each(function(index3, element) {
+                    $(this).click(function () {
+                        layer.photos({
+                                    photos: {
+                                        "data": [{
+                                            "alt": "No Imge",
+                                            "pid": 5,
+                                            "src": `${orderData[index3].shopimg}`
+                                        }]
+                                    },
+                                    footer: false // 是否显示底部栏 --- 2.8.16+
+                                });
+                    })
+                })
+
+                    }
+                })
+            }
+
+
+
+            // 编辑商品
+            $('#editOrder').click(function() {
+                localStorage.setItem('info',JSON.stringify({
+                    username:$('#username').val(),
+                    mobile:$('#mobile').val()
+                }))
+                window.open('./index.html','_self')
+            })
+            getCartList()
+            async function pay(paramsdata) {
+                const response = await fetch('/payAPIRouterInterface/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: paramsdata.hejijine * 100, currency: 'gbp', name: paramsdata.remark }),
+                });
+
+                if (response.ok) {
+                    const { sessionId } = await response.json();
+                    const stripe = Stripe('pk_test_51Q6s1u08Z1LKSosSSMGJDR8IzZkBi46S0fg0TCVgGrSJTQtmLEo2htcSkgWogmVLdbx3BdvpR3cw8q2lGMyCMD4E00Kas4IDt7');
+                    stripe.redirectToCheckout({ sessionId }).then(function (result) {
+                        if (result.error) {
+                            alert(result.error.message);
+                        } else {
+                            localStorage.removeItem('huhao')
+                        }
+                    });
+                } else {
+                    const errorData = await response.json();
+                    alert('Error: ' + errorData.error);
+                }
+            }
+        });
+    </script>
+
+</body>
+
+</html>
